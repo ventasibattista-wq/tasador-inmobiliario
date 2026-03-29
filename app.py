@@ -34,9 +34,12 @@ st.markdown("""
 # --- FUNCIONES DE EXTRACCIÓN ---
 @st.cache_data(show_spinner=False) 
 def obtener_links_del_listado(url_listado):
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
-    respuesta = requests.get(url_listado, headers=headers)
-    if respuesta.status_code != 200: return []
+    # Creamos el "disfraz" anti-bots
+    scraper = cloudscraper.create_scraper(browser={'browser': 'chrome', 'platform': 'windows', 'desktop': True})
+    
+    respuesta = scraper.get(url_listado)
+    if respuesta.status_code != 200:
+        return []
     soup = BeautifulSoup(respuesta.text, 'html.parser')
     tarjetas = soup.find_all('li', class_='ui-search-layout__item')
     links = []
@@ -44,15 +47,20 @@ def obtener_links_del_listado(url_listado):
         link_elemento = tarjeta.find('a', href=True)
         if link_elemento:
             link_encontrado = link_elemento['href']
-            if "alquiler" not in link_encontrado.lower(): links.append(link_encontrado)
+            if "alquiler" not in link_encontrado.lower():
+                links.append(link_encontrado)
     return links
 
 def extraer_detalle_propiedad(url_propiedad):
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
-    respuesta = requests.get(url_propiedad, headers=headers)
-    if respuesta.status_code != 200: return None
+    # Creamos el "disfraz" anti-bots
+    scraper = cloudscraper.create_scraper(browser={'browser': 'chrome', 'platform': 'windows', 'desktop': True})
+    
+    respuesta = scraper.get(url_propiedad)
+    if respuesta.status_code != 200:
+        return None
     soup = BeautifulSoup(respuesta.text, 'html.parser')
     titulo_el = soup.find('h1', class_='ui-pdp-title')
+# ... DE AQUÍ EN ADELANTE EL RESTO DE LA FUNCIÓN SIGUE EXACTAMENTE IGUAL ...
     titulo = titulo_el.text.strip() if titulo_el else "Sin título"
     moneda_el = soup.find('span', class_='andes-money-amount__currency-symbol')
     moneda = moneda_el.text.strip() if moneda_el else ""
