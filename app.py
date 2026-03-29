@@ -31,76 +31,91 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- FUNCIONES DE EXTRACCIÓN ---
+# --- FUNCIONES DE EXTRACCIÓN (Vía ScraperAPI) ---
 @st.cache_data(show_spinner=False) 
 def obtener_links_del_listado(url_listado):
-    # Creamos el "disfraz" anti-bots
-    scraper = cloudscraper.create_scraper(browser={'browser': 'chrome', 'platform': 'windows', 'desktop': True})
+    # Traemos tu clave secreta desde la configuración de Streamlit
+    API_KEY = st.secrets["SCRAPER_API_KEY"]
     
-    respuesta = scraper.get(url_listado)
-    if respuesta.status_code != 200:
-        return []
-    soup = BeautifulSoup(respuesta.text, 'html.parser')
-    tarjetas = soup.find_all('li', class_='ui-search-layout__item')
-    links = []
-    for tarjeta in tarjetas:
-        link_elemento = tarjeta.find('a', href=True)
-        if link_elemento:
-            link_encontrado = link_elemento['href']
-            if "alquiler" not in link_encontrado.lower():
-                links.append(link_encontrado)
-    return links
-
-def extraer_detalle_propiedad(url_propiedad):
-    # Creamos el "disfraz" anti-bots
-    scraper = cloudscraper.create_scraper(browser={'browser': 'chrome', 'platform': 'windows', 'desktop': True})
-    
-    respuesta = scraper.get(url_propiedad)
-    if respuesta.status_code != 200:
-        return None
-    soup = BeautifulSoup(respuesta.text, 'html.parser')
-    titulo_el = soup.find('h1', class_='ui-pdp-title')
-# ... DE AQUÍ EN ADELANTE EL RESTO DE LA FUNCIÓN SIGUE EXACTAMENTE IGUAL ...
-    titulo = titulo_el.text.strip() if titulo_el else "Sin título"
-    moneda_el = soup.find('span', class_='andes-money-amount__currency-symbol')
-    moneda = moneda_el.text.strip() if moneda_el else ""
-    precio_el = soup.find('span', class_='andes-money-amount__fraction')
-    precio = precio_el.text.strip() if precio_el else "Sin precio"
-    superficie, ambientes, antiguedad = "No especificada", "No especificados", "No especificada"
-    filas_tabla = soup.find_all('tr', class_='andes-table__row')
-    for fila in filas_tabla:
-        encabezado = fila.find('th')
-        valor = fila.find('td')
-        if encabezado and valor:
-            texto = encabezado.text.lower()
-            if "superficie total" in texto: superficie = valor.text.strip()
-            elif "ambientes" in texto: ambientes = valor.text.strip()
-            elif "antigüedad" in texto or "antiguedad" in texto: antiguedad = valor.text.strip()
-
-    precio_limpio = precio.replace(".", "").strip()
-    superficie_limpia = superficie.replace(" m²", "").replace(" m2", "").replace(" útil", "").replace(",", ".").strip()
-    ambientes_limpios = ambientes.replace(" ambientes", "").replace(" ambiente", "").strip()
-    precio_m2 = "No calculable"
-    superficie_final = superficie_limpia
+    # Preparamos la orden para el testaferro digital
+    payload = {'api_key': API_KEY, 'url': url_listado, 'country_code': 'ar'}
     
     try:
-        num_precio = float(precio_limpio)
-        num_superficie = float(superficie_limpia)
-        if num_superficie > 0:
-            precio_m2 = int(round(num_precio / num_superficie))
-            superficie_final = int(round(num_superficie))
-    except ValueError: pass
+        respuesta = requests.get('http://api.scraperapi.com', params=payload)
+        if respuesta.status_code != 200:
+            return []
+            
+        soup = BeautifulSoup(respuesta.text, 'html.parser')
+        tarjetas = soup.find_all('li', class_='ui-search-layout__item')
+        links = []
+        for tarjeta in tarjetas:
+            link_elemento = tarjeta.find('a', href=True)
+            if link_elemento:
+                link_encontrado = link_elemento['href']
+                if "alquiler" not in link_encontrado.lower():
+                    links.append(link_encontrado)
+        return links
+    except:
+        return []
 
-    return {
-        "Titulo": titulo,
-        "Moneda": moneda,
-        "Precio": int(precio_limpio) if precio_limpio.isdigit() else precio_limpio, 
-        "Superficie": superficie_final,
-        "Ambientes": ambientes_limpios,
-        "Antigüedad": antiguedad,
-        "Precio_m2": precio_m2,
-        "Link": url_propiedad
-    }
+def extraer_detalle_propiedad(url_propiedad):
+    API_KEY = st.secrets["SCRAPER_API_KEY"]
+    payload = {'api_key': API_KEY, 'url': url_propiedad, 'country_code': 'ar'}
+    
+    try:
+        respuesta = requests.get('http://api.scraperapi.com', params=payload)
+        if respuesta.status_code != 200:
+            return None
+            
+        soup = BeautifulSoup(respuesta.text, 'html.parser')
+        titulo_el = soup.find('h1', class_='ui-pdp-title')
+        titulo = titulo_el.text.strip() if titulo_el else "Sin título"
+        moneda_el = soup.find('span', class_='andes-money-amount__currency-symbol')
+        moneda = moneda_el.text.strip() if moneda_el else ""
+        precio_el = soup.find('span', class_='andes-money-amount__fraction')
+        precio = precio_el.text.strip() if precio_el else "Sin precio"
+        superficie, ambientes, antiguedad = "No especificada", "No especificados", "No especificada"
+        filas_tabla = soup.find_all('tr', class_='andes-table__row')
+        for fila in filas_tabla:
+            encabezado = fila.find('th')
+            valor = fila.find('td')
+            if encabezado and valor:
+                texto = encabezado.text.lower()
+                if "superficie total" in texto:
+                    superficie = valor.text.strip()
+                elif "ambientes" in texto:
+                    ambientes = valor.text.strip()
+                elif "antigüedad" in texto or "antiguedad" in texto:
+                    antiguedad = valor.text.strip()
+
+        precio_limpio = precio.replace(".", "").strip()
+        superficie_limpia = superficie.replace(" m²", "").replace(" m2", "").replace(" útil", "").replace(",", ".").strip()
+        ambientes_limpios = ambientes.replace(" ambientes", "").replace(" ambiente", "").strip()
+        precio_m2 = "No calculable"
+        superficie_final = superficie_limpia
+        
+        try:
+            num_precio = float(precio_limpio)
+            num_superficie = float(superficie_limpia)
+            if num_superficie > 0:
+                calculo = num_precio / num_superficie
+                precio_m2 = int(round(calculo))
+                superficie_final = int(round(num_superficie))
+        except ValueError:
+            pass
+
+        return {
+            "Titulo": titulo,
+            "Moneda": moneda,
+            "Precio": int(precio_limpio) if precio_limpio.isdigit() else precio_limpio, 
+            "Superficie": superficie_final,
+            "Ambientes": ambientes_limpios,
+            "Antigüedad": antiguedad,
+            "Precio_m2": precio_m2,
+            "Link": url_propiedad
+        }
+    except:
+        return None
 
 def formato_moneda(numero): return f"{numero:,.0f}".replace(",", ".")
 
