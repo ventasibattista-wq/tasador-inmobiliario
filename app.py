@@ -1,5 +1,6 @@
 import streamlit as st
 import requests
+import cloudscraper  # <-- NUEVA LIBRERÍA
 from bs4 import BeautifulSoup
 import time
 import statistics
